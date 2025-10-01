@@ -1,5 +1,5 @@
 *.env
-*.txt
+kalshi-api-key.txt
 data
 __pycache__
 .archive
