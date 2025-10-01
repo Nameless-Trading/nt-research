@@ -11,13 +11,7 @@ def get_trades(trade_time: int):
     breaks = [x * 10 for x in range(10)]
 
     return (
-        df.select(
-            "end_period_ts",
-            "ticker",
-            "yes_ask_close",
-            "game_start_time_utc",
-            "result",
-        )
+        df
         .with_columns(
             pl.col("end_period_ts")
             .sub(pl.col("game_start_time_utc"))
@@ -32,10 +26,10 @@ def get_trades(trade_time: int):
         .group_by("ticker")
         .agg(
             pl.col("elapsed_time").first(),
-            pl.col("yes_ask_close").first(),
+            pl.mean_horizontal('yes_bid_close', 'yes_ask_close').first().alias('price'),
             pl.col("result").mean(),
         )
-        .with_columns(pl.col("yes_ask_close").cut(breaks).cast(pl.String).alias("bin"))
+        .with_columns(pl.col("price").cut(breaks).cast(pl.String).alias("bin"))
         .sort("ticker")
     )
 
@@ -45,12 +39,12 @@ def get_profits(trades: pl.DataFrame) -> pl.DataFrame:
         trades.filter(pl.col("bin").eq("(90, inf]"))
         .with_columns(
             pl.when(pl.col("result").eq(1))
-            .then(pl.lit(100).sub("yes_ask_close"))
-            .otherwise(pl.col("yes_ask_close").mul(-1))
+            .then(pl.lit(100).sub("price"))
+            .otherwise(pl.col("price").mul(-1))
             .alias("profit")
         )
         .with_columns(
-            pl.col("profit").truediv("yes_ask_close").mul(100).alias("return"),
+            pl.col("profit").truediv("price").mul(100).alias("return"),
             pl.col("result")
             .cast(pl.String)
             .replace({"1.0": "Won", "0.0": "Lost"})
@@ -72,7 +66,7 @@ def create_performance_table(
             pl.col('elapsed_time').mean(),
             pl.len().alias("count"),
             pl.col("profit").sum(),
-            pl.col("yes_ask_close").sum().alias("price"),
+            pl.col("price").sum().alias("price"),
             pl.col("return").mean().alias("return_mean"),
             pl.col("return").std().alias("return_stdev"),
         )
@@ -83,8 +77,8 @@ def create_performance_table(
     if file_name is not None:
         with open(file_name, "w") as f:
             f.write(str(table))
-
-    return table
+    else:
+        print(table)
 
 
 if __name__ == "__main__":
@@ -105,5 +99,5 @@ if __name__ == "__main__":
     # Get results
     results = create_performance_table(
         profits, 
-        file_name=f"{folder}/performance_table_t={trade_time}.txt"
+        # file_name=f"{folder}/performance_table_t={trade_time}.txt"
     )
