@@ -10,7 +10,6 @@ def get_trades(trade_time: int):
 
     breaks = [x * 10 for x in range(10)]
 
-    # Buy after game starts
     return (
         df.select(
             "end_period_ts",
