@@ -16,7 +16,6 @@ def get_settled_markets_dataset():
             pl.col('series_ticker'),
             pl.col('ticker'), 
             pl.col('expected_expiration_time').str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ").dt.replace_time_zone("UTC").dt.offset_by("-3h").alias("game_start_time_utc"),
-            pl.col('expected_expiration_time').str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ").dt.replace_time_zone("UTC").dt.offset_by("3h").alias("game_end_time_utc"),
             pl.col('result')
         )
     )
@@ -25,12 +24,15 @@ def get_settled_markets_dataset():
 
     candlesticks_list = []
     for market in tqdm(markets.to_dicts(), "Downloading historical data."):
+        start_ts = market['game_start_time_utc'] - dt.timedelta(hours=12)
+        end_ts = market['game_start_time_utc'] + dt.timedelta(hours=12)
+
         candlesticks_ = (
             kalshi_client.get_market_candlesticks(
                 series_ticker=market['series_ticker'],
                 ticker=market['ticker'],
-                start_ts=market['game_start_time_utc'],
-                end_ts=market['game_end_time_utc'],
+                start_ts=start_ts,
+                end_ts=end_ts,
                 period_interval=1
             )
         )
@@ -51,7 +53,7 @@ def get_settled_markets_dataset():
     
     df_markets = (
         markets
-        .select('ticker', 'game_start_time_utc', 'game_end_time_utc', 'result')
+        .select('ticker', 'game_start_time_utc', 'result')
     )
 
     df_history = (
