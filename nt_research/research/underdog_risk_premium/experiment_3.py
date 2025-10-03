@@ -3,6 +3,7 @@ import datetime as dt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+from great_tables import GT
 
 
 def get_trades(trade_time: int):
@@ -44,7 +45,7 @@ def get_profits(trades: pl.DataFrame) -> pl.DataFrame:
             .alias("profit")
         )
         .with_columns(
-            pl.col("profit").truediv("price").mul(100).alias("return"),
+            pl.col("profit").truediv("price").alias("return"),
             pl.col("result")
             .cast(pl.String)
             .replace({"1.0": "Won", "0.0": "Lost"})
@@ -54,7 +55,7 @@ def get_profits(trades: pl.DataFrame) -> pl.DataFrame:
 
 
 def create_performance_table(
-    profits: pl.DataFrame, file_name: str | None = None
+    profits: pl.DataFrame, title: str | None = None, file_name: str | None = None
 ) -> pl.DataFrame:
     totals = profits.with_columns(pl.lit("Total").alias("trades_type"))
 
@@ -75,8 +76,24 @@ def create_performance_table(
     )
 
     if file_name is not None:
-        with open(file_name, "w") as f:
-            f.write(str(table))
+        gt = (
+            GT(table)
+            .tab_header(title=title)
+            .fmt_number(columns=["elapsed_time", "count", "profit", "price", "sharpe"], decimals=2)
+            .fmt_percent(columns=["return_mean", "return_stdev"])
+            .cols_label(
+                trades_type="Trades",
+                elapsed_time="Elapsed Time",
+                count="Count",
+                profit="Profit",
+                price="Price",
+                return_mean="Return Mean",
+                return_stdev="Return Std. Dev.",
+                sharpe="Sharpe"
+            )
+            .opt_stylize(style=5, color='gray')
+        )
+        gt.save(file_name)
     else:
         print(table)
 
@@ -99,5 +116,5 @@ if __name__ == "__main__":
     # Get results
     results = create_performance_table(
         profits, 
-        # file_name=f"{folder}/performance_table_t={trade_time}.txt"
+        file_name=f"{folder}/performance_table_t={trade_time}.png"
     )
