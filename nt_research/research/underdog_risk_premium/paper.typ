@@ -1,11 +1,39 @@
+#import "@preview/charged-ieee:0.1.4": ieee
 #set document(title: "Underdog Risk Premium")
-#set page(margin: 1in)
+#set page(margin: 1in, columns: 2)
 #set par(justify: true)
 #set text(size: 11pt)
 
-#align(center)[
-  #text(size: 17pt, weight: "bold")[Underdog Risk Premium]
-]
+#show: ieee.with(
+  title: [Underdog Risk Premium],
+  abstract: [
+    Prediction markets have experienced rapid growth following recent regulatory changes, with platforms like Kalshi emerging as key venues for betting on real-world events. This report examines the college football prediction market for the 2025 season to identify pricing inefficiencies and potential arbitrage opportunities. Our analysis reveals systematic mispricing in the final 30 minutes before kickoff, specifically for contracts trading in the 90-100 probability range, suggesting exploitable market inefficiencies during this critical pre-game window.
+  ],
+  authors: (
+    (
+      name: "Andrew Hall",
+      department: [Co-Founder],
+      organization: [Nameless Trading],
+      location: [Provo, Utah],
+      email: "andrewmartinhall2@gmail.com"
+    ),
+    (
+      name: "Brandon Waits",
+      department: [Co-Founder],
+      organization: [Nameless Trading],
+      location: [Provo, Utah],
+      email: "brandonwaits12@gmail.com"
+    ),
+    (
+      name: "Justin Hill",
+      department: [Co-Founder],
+      organization: [Nameless Trading],
+      location: [Newport Beach, California],
+      email: "jrhill426@gmail.com"
+    ),
+  ),
+  index-terms: ("Prediction markets", "Market efficiency", "Behavioral finance", "Trading strategies"),
+)
 
 = Background
 
