@@ -3,6 +3,7 @@ import datetime as dt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+from great_tables import GT
 
 
 def get_trades(trade_time: int):
@@ -54,7 +55,7 @@ def get_aggregate_trades(trades: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def create_calibration_table(aggregate_trades: pl.DataFrame, file_name: str | None = None) -> pl.DataFrame:
+def create_calibration_table(aggregate_trades: pl.DataFrame, title: str | None = None, file_name: str | None = None) -> pl.DataFrame:
     table = (
         aggregate_trades.with_columns(pl.col("result_mean", "result_stdev").mul(100))
         .with_columns(pl.col("result_mean").sub("price_mean").alias("delta"))
@@ -67,8 +68,23 @@ def create_calibration_table(aggregate_trades: pl.DataFrame, file_name: str | No
     )
 
     if file_name is not None:
-        with open(file_name, "w") as f:
-            f.write(str(table))
+        gt = (
+            GT(table)
+            .tab_header(title=title)
+            .fmt_number(columns=["trade_time_mean", "price_mean", "result_mean", "result_stdev", "delta", "tstat"], decimals=2)
+            .cols_label(
+                bin="Price Group",
+                trade_time_mean="Trade Time Mean",
+                price_mean="Price Mean",
+                result_mean="Result Mean",
+                result_stdev="Result St. Dev.",
+                count="Count",
+                delta="Delta",
+                tstat="T-stat"
+            )
+            .opt_stylize(style=5, color='gray')
+        )
+        gt.save(file_name)
 
     return table
 
@@ -79,7 +95,7 @@ def create_calibration_chart(
     plt.figure(figsize=(10, 6))
 
     # Result bars
-    sns.barplot(aggregate_trades, x="bin", y="result_mean")
+    sns.barplot(aggregate_trades, x="bin", y="result_mean", color="dimgray")
 
     # Perfect calibration reference line
     x_vals = [(x * 10 + 5) / 100 for x in range(10)]
@@ -126,7 +142,9 @@ if __name__ == "__main__":
 
     # Save results
     calibration_table = create_calibration_table(
-        aggregate_trades, file_name=f"{folder}/calibration_table_t={trade_time}.txt"
+        aggregate_trades, 
+        title=f"Contract Calibration (t={trade_time})",
+        file_name=f"{folder}/calibration_table_t={trade_time}.png"
     )
 
     create_calibration_chart(

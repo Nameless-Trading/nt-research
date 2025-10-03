@@ -80,10 +80,10 @@ def create_calibration_over_time_chart(
     # Lines
     if price_bin is not None:
         sns.lineplot(
-            aggregate_trades, x="trade_time_mean", y="result_mean", label="Result Mean"
+            aggregate_trades, x="trade_time_mean", y="result_mean", label="Result Mean", color="black"
         )
         sns.lineplot(
-            aggregate_trades, x="trade_time_mean", y="price_mean", label="Price Mean"
+            aggregate_trades, x="trade_time_mean", y="price_mean", label="Price Mean", color="black", linestyle="--"
         )
     else:
         sns.lineplot(
