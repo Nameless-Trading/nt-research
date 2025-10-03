@@ -73,37 +73,44 @@ def create_calibration_over_time_chart(
             pl.col("price_bin").eq("(90, inf]")
         ).sort("trade_time_mean")
 
-    plt.figure(figsize=(10, 6))
+    _, ax = plt.subplots(figsize=(10, 6))
 
     # Lines
     if price_bin is not None:
-        aggregate_trades = (
-            aggregate_trades
-            .unpivot(index=['time_bin', 'price_bin'], on=['price_mean', 'result_mean', 'tstat']) 
+        aggregate_trades_sorted = aggregate_trades.sort(
+            pl.col("time_bin").str.extract(r"\((-?\d+)", 1).cast(pl.Int64)
+        )
+
+        tstat_values = aggregate_trades_sorted['tstat'].to_list()
+        time_bins = aggregate_trades_sorted['time_bin'].to_list()
+
+        aggregate_trades_unpivot = (
+            aggregate_trades_sorted
+            .unpivot(index=['time_bin', 'price_bin'], on=['price_mean', 'result_mean', 'tstat'])
+            .filter(
+                pl.col('variable').ne('tstat')
+            )
             .sort(
                 pl.col("time_bin").str.extract(r"\((-?\d+)", 1).cast(pl.Int64),
                 'variable'
             )
         )
 
-        tstat = (
-            aggregate_trades
-            .filter(
-                pl.col('variable').eq('tstat')
-            )
-            .sort(
-                pl.col("time_bin").str.extract(r"\((-?\d+)", 1).cast(pl.Int64),
-            )            
-            ['value'].to_list()
+        sns.barplot(
+            aggregate_trades_unpivot, x="time_bin", y="value", hue='variable', palette='gray', ax=ax
         )
 
-        sns.barplot(
-            aggregate_trades, x="time_bin", y="value", hue='variable', palette='gray'
-        )
+        labels = [f"{tb}\n($\\bf{{{ts:.2f}}}$)" for tb, ts in zip(time_bins, tstat_values)]
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels)
+
+        # Get handles and labels from the plot
+        handles, _ = ax.get_legend_handles_labels()
+        ax.legend(handles, ['Price Mean', 'Result Mean'])
 
         match price_bin:
             case "(90, inf]":
-                plt.ylim(90, 100)
+                ax.set_ylim(90, 100)
 
             case _:
                 raise ValueError(f"Unsupported price bin: {price_bin}")
@@ -115,20 +122,22 @@ def create_calibration_over_time_chart(
             y="result_mean",
             hue="price_bin",
             palette="coolwarm",
+            ax=ax
         )
 
     # Format
-    plt.title(title)
-    plt.ylabel(None)
-    plt.xlabel("Mean Elapsed Time")
+    ax.set_title(title)
+    ax.set_ylabel(None)
+    ax.set_xlabel("Time Bin\n($\\bf{T\\text{-}stat}$)" if price_bin is not None else "Mean Elapsed Time")
 
     if price_bin is None:
-        plt.legend(title="Price Bin", bbox_to_anchor=(1, 1), loc="upper left")
-        plt.tight_layout()
+        ax.legend(title="Price Bin", bbox_to_anchor=(1, 1), loc="upper left")
+
+    plt.tight_layout()
 
     # Save/display
     if file_name is not None:
-        plt.savefig(file_name, dpi=300)
+        plt.savefig(file_name, dpi=300, bbox_inches='tight')
     else:
         plt.show()
 
@@ -234,42 +243,40 @@ if __name__ == "__main__":
     # Get aggregate trades
     aggregate_trades = get_aggregate_trades(trades)
 
-    # # Create all bins result
-    # create_calibration_over_time_chart(
-    #     aggregate_trades,
-    #     title="Calibration Over Time Across Price Bins",
-    #     file_name=f"{folder}/calibration-over-time-across-bins.png",
-    # )
-
-    print(aggregate_trades)
+    # Create all bins result
+    create_calibration_over_time_chart(
+        aggregate_trades,
+        title="Calibration Over Time Across Price Bins",
+        file_name=f"{folder}/calibration-over-time-across-bins.png",
+    )
 
     # Create all bins result
     create_calibration_over_time_chart(
         aggregate_trades,
         price_bin="(90, inf]",
         title="(90, inf] Bin Calibration Over Time",
-        # file_name=f"{folder}/calibration-over-time-top-bin.png",
+        file_name=f"{folder}/calibration-over-time-top-bin.png",
     )
 
-    # # Create counts chart
-    # create_count_over_time_chart(
-    #     aggregate_trades,
-    #     price_bin="(90, inf]",
-    #     title="(90, inf] Bin Count Over Time",
-    #     file_name=f"{folder}/count-over-time-top-bin.png",
-    # )
+    # Create counts chart
+    create_count_over_time_chart(
+        aggregate_trades,
+        price_bin="(90, inf]",
+        title="(90, inf] Bin Count Over Time",
+        file_name=f"{folder}/count-over-time-top-bin.png",
+    )
 
-    # # Create tstat chart
-    # create_tstat_chart(
-    #     aggregate_trades,
-    #     title="T-stat Count Over Time Across Price Bins",
-    #     file_name=f"{folder}/tstat-over-time.png",
-    # )
+    # Create tstat chart
+    create_tstat_chart(
+        aggregate_trades,
+        title="T-stat Count Over Time Across Price Bins",
+        file_name=f"{folder}/tstat-over-time.png",
+    )
 
-    # # Create tstat chart top bin
-    # create_tstat_chart(
-    #     aggregate_trades,
-    #     price_bin="(90, inf]",
-    #     title="(90, inf] T-stat Count Over Time",
-    #     file_name=f"{folder}/tstat-over-time-top-bin.png",
-    # )
+    # Create tstat chart top bin
+    create_tstat_chart(
+        aggregate_trades,
+        price_bin="(90, inf]",
+        title="(90, inf] T-stat Count Over Time",
+        file_name=f"{folder}/tstat-over-time-top-bin.png",
+    )
