@@ -7,7 +7,7 @@
 #show: ieee.with(
   title: [Underdog Risk Premium],
   abstract: [
-    Prediction markets have experienced rapid growth following recent regulatory changes, with platforms like Kalshi emerging as key venues for betting on real-world events. This report examines the college football prediction market for the 2025 season to identify pricing inefficiencies and potential arbitrage opportunities. Our analysis reveals systematic mispricing in the final 30 minutes before kickoff, specifically for contracts trading in the 90-100 probability range, suggesting exploitable market inefficiencies during this critical pre-game window.
+    We document systematic mispricing in Kalshi's college football prediction markets during the 2025 season. High-probability contracts (90-100 cents) are consistently underpriced by approximately 4 percentage points in the hours preceding kickoff, with the effect strongest at 30 minutes before game start. We attribute this inefficiency to retail traders' preference for lottery-like payoffs on longshot bets. A trading strategy exploiting this pattern achieves a 99.4% win rate (153 of 154 trades), though concentration risk from expensive contracts limits risk-adjusted returns to a Sharpe ratio of 0.36 (unannualized). Our findings suggest that while market inefficiencies exist and are statistically significant, their exploitation requires careful risk management due to severe tail risk exposure.
   ],
   authors: (
     (
