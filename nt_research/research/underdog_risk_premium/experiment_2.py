@@ -102,6 +102,10 @@ def create_calibration_over_time_chart(
             aggregate_trades_unpivot, x="time_bin", y="value", hue='variable', palette='gray', ax=ax
         )
 
+        # Add bar values
+        for container in ax.containers:
+            ax.bar_label(container, fmt='%.2f')
+
         labels = [f"{tb}\n($\\bf{{{ts:.2f}}}$)" for tb, ts in zip(time_bins, tstat_values)]
         ax.set_xticks(range(len(labels)))
         ax.set_xticklabels(labels)
@@ -224,6 +228,43 @@ def create_tstat_chart(
     else:
         plt.show()
 
+def create_count_heatmap(trades: pl.DataFrame, file_name: str | None = None) -> None:
+    counts = (
+        trades
+        .filter(
+            pl.col('yes_ask_close').ne(100)
+        )
+        .group_by('price_bin', 'time_bin')
+        .agg(pl.col('ticker').n_unique().alias('count'))
+        .sort('price_bin', descending=True)
+        .pivot(index='price_bin', on='time_bin', values='count')
+        .select(
+            'price_bin', '(-180, -120]', '(-120, -60]', '(-60, 0]', '(0, 60]', '(60, 120]', '(120, 180]'
+        )
+    )
+
+    counts_data = counts.drop('price_bin')
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(
+        counts_data,
+        annot=True,
+        fmt='g',
+        cmap='YlOrRd',
+        xticklabels=counts_data.columns,
+        yticklabels=counts['price_bin'].to_list(),
+        cbar_kws={'label': 'Count'}
+    )
+    plt.xlabel('Time Bin')
+    plt.ylabel('Price Bin')
+    plt.title('Trade Count Heatmap')
+    plt.tight_layout()
+
+    if file_name is not None:
+        plt.savefig(file_name, dpi=300)
+    else:
+        plt.show()
+
 if __name__ == "__main__":
     # Params
     min_elapsed_time = -180
@@ -281,4 +322,10 @@ if __name__ == "__main__":
         price_bin="(90, 99]",
         title="(90, 99] T-stat Count Over Time",
         file_name=f"{folder}/tstat-over-time-top-bin.png",
+    )
+
+    # Create counts heatmap
+    create_count_heatmap(
+        trades,
+        file_name=f"{folder}/counts-heatmap.png"
     )

@@ -78,7 +78,7 @@ Implementing this strategy generates 141 trades over our sample period, with 139
 
 #figure(
   image("results/experiment_3/performance_table_t=-60.png"),
-  caption: [Strategy performance metrics at t=-30 minutes]
+  caption: [Strategy performance metrics at t=-60 minutes]
 )
 
 This performance degradation highlights the strategy's vulnerability to tail risk. We propose that disciplined risk management through stop-loss orders could meaningfully improve risk-adjusted returns by capping downside exposure on losing positions while preserving the high win rate that drives profitability.
