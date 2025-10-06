@@ -10,7 +10,6 @@ BASE_URL = "https://api.elections.kalshi.com/trade-api/v2/"
 
 
 class KalshiClient:
-
     def __init__(self, api_key_id: str, private_key_pem: str) -> None:
         self.api_key_id = api_key_id
         self.private_key_pem = private_key_pem

@@ -1,7 +1,4 @@
 import polars as pl
-import datetime as dt
-import seaborn as sns
-import matplotlib.pyplot as plt
 import os
 from great_tables import GT
 
@@ -12,8 +9,7 @@ def get_trades(trade_time: int):
     breaks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
 
     return (
-        df
-        .with_columns(
+        df.with_columns(
             pl.col("end_period_ts")
             .sub(pl.col("game_start_time_utc"))
             .dt.total_minutes()
@@ -27,12 +23,10 @@ def get_trades(trade_time: int):
         .group_by("ticker")
         .agg(
             pl.col("elapsed_time").first(),
-            pl.col('yes_ask_close').first().alias('price'),
+            pl.col("yes_ask_close").first().alias("price"),
             pl.col("result").mean(),
         )
-        .filter(
-            pl.col('price').is_between(1, 99)
-        )
+        .filter(pl.col("price").is_between(1, 99))
         .with_columns(pl.col("price").cut(breaks).cast(pl.String).alias("bin"))
         .sort("ticker")
     )
@@ -58,12 +52,8 @@ def get_profits(trades: pl.DataFrame, price_bin: str) -> pl.DataFrame:
 
 
 def get_lost_trades(trades: pl.DataFrame, price_bin: str) -> pl.DataFrame:
-    return (
-        trades.filter(
-            pl.col('result').eq(0),
-            pl.col('bin').eq(price_bin)
-        )
-        .sort('ticker')
+    return trades.filter(pl.col("result").eq(0), pl.col("bin").eq(price_bin)).sort(
+        "ticker"
     )
 
 
@@ -77,7 +67,7 @@ def create_performance_table(
     table = (
         profits_merge.group_by("trades_type")
         .agg(
-            pl.col('elapsed_time').mean(),
+            pl.col("elapsed_time").mean(),
             pl.len().alias("count"),
             pl.col("profit").sum(),
             pl.col("price").sum().alias("price"),
@@ -92,7 +82,10 @@ def create_performance_table(
         gt = (
             GT(table)
             .tab_header(title=title)
-            .fmt_number(columns=["elapsed_time", "count", "profit", "price", "sharpe"], decimals=2)
+            .fmt_number(
+                columns=["elapsed_time", "count", "profit", "price", "sharpe"],
+                decimals=2,
+            )
             .fmt_percent(columns=["return_mean", "return_stdev"])
             .cols_label(
                 trades_type="Trades",
@@ -102,9 +95,9 @@ def create_performance_table(
                 price="Price",
                 return_mean="Return Mean",
                 return_stdev="Return Std. Dev.",
-                sharpe="Sharpe"
+                sharpe="Sharpe",
             )
-            .opt_stylize(style=5, color='gray')
+            .opt_stylize(style=5, color="gray")
         )
         gt.save(file_name)
     else:
@@ -128,8 +121,7 @@ if __name__ == "__main__":
 
     # Get results
     results = create_performance_table(
-        profits, 
-        file_name=f"{folder}/performance_table_t={trade_time}.png"
+        profits, file_name=f"{folder}/performance_table_t={trade_time}.png"
     )
 
     # Lost trades

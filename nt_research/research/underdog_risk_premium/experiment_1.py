@@ -1,5 +1,4 @@
 import polars as pl
-import datetime as dt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
@@ -8,7 +7,7 @@ from great_tables import GT
 
 def get_trades(trade_time: int):
     df = pl.read_parquet("data/2025-10-05_history.parquet")
-    print(df.select('ticker').unique())
+    print(df.select("ticker").unique())
 
     breaks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
 
@@ -37,9 +36,7 @@ def get_trades(trade_time: int):
             pl.col("yes_ask_close").first(),
             pl.col("result").mean(),
         )
-        .filter(
-            pl.col('yes_ask_close').is_between(1, 99)
-        )
+        .filter(pl.col("yes_ask_close").is_between(1, 99))
         .with_columns(pl.col("yes_ask_close").cut(breaks).cast(pl.String).alias("bin"))
         .sort("ticker")
     )
@@ -59,7 +56,11 @@ def get_aggregate_trades(trades: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def create_calibration_table(aggregate_trades: pl.DataFrame, title: str | None = None, file_name: str | None = None) -> pl.DataFrame:
+def create_calibration_table(
+    aggregate_trades: pl.DataFrame,
+    title: str | None = None,
+    file_name: str | None = None,
+) -> pl.DataFrame:
     table = (
         aggregate_trades.with_columns(pl.col("result_mean", "result_stdev").mul(100))
         .with_columns(pl.col("result_mean").sub("price_mean").alias("delta"))
@@ -75,7 +76,17 @@ def create_calibration_table(aggregate_trades: pl.DataFrame, title: str | None =
         gt = (
             GT(table)
             .tab_header(title=title)
-            .fmt_number(columns=["trade_time_mean", "price_mean", "result_mean", "result_stdev", "delta", "tstat"], decimals=2)
+            .fmt_number(
+                columns=[
+                    "trade_time_mean",
+                    "price_mean",
+                    "result_mean",
+                    "result_stdev",
+                    "delta",
+                    "tstat",
+                ],
+                decimals=2,
+            )
             .cols_label(
                 bin="Price Group",
                 trade_time_mean="Trade Time Mean",
@@ -84,9 +95,9 @@ def create_calibration_table(aggregate_trades: pl.DataFrame, title: str | None =
                 result_stdev="Result St. Dev.",
                 count="Count",
                 delta="Delta",
-                tstat="T-stat"
+                tstat="T-stat",
             )
-            .opt_stylize(style=5, color='gray')
+            .opt_stylize(style=5, color="gray")
         )
         gt.save(file_name)
     else:
@@ -146,9 +157,9 @@ if __name__ == "__main__":
 
     # Save results
     calibration_table = create_calibration_table(
-        aggregate_trades, 
+        aggregate_trades,
         title=f"Contract Calibration (t={trade_time})",
-        file_name=f"{folder}/calibration_table_t={trade_time}.png"
+        file_name=f"{folder}/calibration_table_t={trade_time}.png",
     )
 
     create_calibration_chart(
