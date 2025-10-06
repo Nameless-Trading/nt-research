@@ -3,49 +3,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+import nt_research.research.underdog_risk_premium.data_utils as du
 
-
-def get_trades(min_elapsed_time: int, max_elapsed_time, time_interval: int):
-    df = pl.read_parquet("data/2025-10-05_history.parquet")
-
-    price_breaks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
-    time_breaks = np.arange(
-        min_elapsed_time, max_elapsed_time + time_interval, time_interval
-    )
-
-    return (
-        df.select(
-            "end_period_ts",
-            "ticker",
-            "yes_ask_close",
-            "game_start_time_utc",
-            "result",
-        )
-        .with_columns(
-            pl.col("end_period_ts")
-            .sub(pl.col("game_start_time_utc"))
-            .dt.total_minutes()
-            .alias("elapsed_time"),
-            pl.col("result").replace({"yes": "1", "no": "0"}).cast(pl.Int32),
-        )
-        .sort("ticker", "end_period_ts")
-        .filter(
-            pl.col("elapsed_time").is_between(
-                min_elapsed_time, max_elapsed_time, closed="right"
-            )
-        )
-        .with_columns(
-            pl.col("yes_ask_close")
-            .cut(price_breaks)
-            .cast(pl.String)
-            .alias("price_bin"),
-            pl.col("elapsed_time").cut(time_breaks).cast(pl.String).alias("time_bin"),
-        )
-        .sort("ticker")
-    )
-
-
-def get_aggregate_trades(trades: pl.DataFrame) -> pl.DataFrame:
+def get_results(trades: pl.DataFrame) -> pl.DataFrame:
     return (
         trades.group_by("price_bin", "time_bin")
         .agg(
@@ -55,7 +15,6 @@ def get_aggregate_trades(trades: pl.DataFrame) -> pl.DataFrame:
             pl.col("result").std().mul(100).alias("result_stdev"),
             pl.len().alias("count"),
         )
-        .filter(pl.col("price_mean").is_between(1, 99))
         .with_columns(
             (
                 (pl.col("result_mean") - pl.col("price_mean"))
@@ -293,25 +252,25 @@ if __name__ == "__main__":
     os.makedirs(folder, exist_ok=True)
 
     # Get trades
-    trades = get_trades(
+    trades = du.get_trades(
         min_elapsed_time=min_elapsed_time,
         max_elapsed_time=max_elapsed_time,
         time_interval=time_interval,
     )
 
     # Get aggregate trades
-    aggregate_trades = get_aggregate_trades(trades)
+    results = get_results(trades)
 
     # Create all bins result
     create_calibration_over_time_chart(
-        aggregate_trades,
+        results,
         title="Calibration Over Time Across Price Bins",
         file_name=f"{folder}/calibration-over-time-across-bins.png",
     )
 
     # Create all bins result
     create_calibration_over_time_chart(
-        aggregate_trades,
+        results,
         price_bin="(90, 99]",
         title="(90, 99] Bin Calibration Over Time",
         file_name=f"{folder}/calibration-over-time-top-bin.png",
@@ -319,7 +278,7 @@ if __name__ == "__main__":
 
     # Create counts chart
     create_count_over_time_chart(
-        aggregate_trades,
+        results,
         price_bin="(90, 99]",
         title="(90, 99] Bin Count Over Time",
         file_name=f"{folder}/count-over-time-top-bin.png",
@@ -327,14 +286,14 @@ if __name__ == "__main__":
 
     # Create tstat chart
     create_tstat_chart(
-        aggregate_trades,
+        results,
         title="T-stat Count Over Time Across Price Bins",
         file_name=f"{folder}/tstat-over-time.png",
     )
 
     # Create tstat chart top bin
     create_tstat_chart(
-        aggregate_trades,
+        results,
         price_bin="(90, 99]",
         title="(90, 99] T-stat Count Over Time",
         file_name=f"{folder}/tstat-over-time-top-bin.png",

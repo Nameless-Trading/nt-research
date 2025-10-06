@@ -3,48 +3,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 from great_tables import GT
+import numpy as np
+import nt_research.research.underdog_risk_premium.data_utils as du
 
 
-def get_trades(trade_time: int):
-    df = pl.read_parquet("data/2025-10-05_history.parquet")
-    print(df.select("ticker").unique())
-
-    breaks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
-
+def get_results(trades: pl.DataFrame) -> pl.DataFrame:
     return (
-        df.select(
-            "end_period_ts",
-            "ticker",
-            "yes_ask_close",
-            "game_start_time_utc",
-            "result",
-        )
-        .with_columns(
-            pl.col("end_period_ts")
-            .sub(pl.col("game_start_time_utc"))
-            .dt.total_minutes()
-            .alias("elapsed_time"),
-            pl.col("result").replace({"yes": "1", "no": "0"}).cast(pl.Int32),
-        )
-        .filter(
-            pl.col("elapsed_time").ge(trade_time),  # after trade_time minutes
-        )
-        .sort("ticker", "end_period_ts")
-        .group_by("ticker")
-        .agg(
-            pl.col("elapsed_time").first(),
-            pl.col("yes_ask_close").first(),
-            pl.col("result").mean(),
-        )
-        .filter(pl.col("yes_ask_close").is_between(1, 99))
-        .with_columns(pl.col("yes_ask_close").cut(breaks).cast(pl.String).alias("bin"))
-        .sort("ticker")
-    )
-
-
-def get_aggregate_trades(trades: pl.DataFrame) -> pl.DataFrame:
-    return (
-        trades.group_by("bin")
+        trades
+        # Get price bin level results
+        .group_by("price_bin")
         .agg(
             pl.col("elapsed_time").mean().alias("trade_time_mean"),
             pl.col("yes_ask_close").mean().alias("price_mean"),
@@ -52,17 +19,7 @@ def get_aggregate_trades(trades: pl.DataFrame) -> pl.DataFrame:
             pl.col("result").std().alias("result_stdev"),
             pl.len().alias("count"),
         )
-        .sort("price_mean")
-    )
-
-
-def create_calibration_table(
-    aggregate_trades: pl.DataFrame,
-    title: str | None = None,
-    file_name: str | None = None,
-) -> pl.DataFrame:
-    table = (
-        aggregate_trades.with_columns(pl.col("result_mean", "result_stdev").mul(100))
+        .with_columns(pl.col("result_mean", "result_stdev").mul(100))
         .with_columns(pl.col("result_mean").sub("price_mean").alias("delta"))
         .with_columns(
             (
@@ -70,11 +27,18 @@ def create_calibration_table(
                 / (pl.col("result_stdev") / pl.col("count").sqrt())
             ).alias("tstat")
         )
+        .sort("price_mean")
     )
 
+
+def create_calibration_table(
+    results: pl.DataFrame,
+    title: str | None = None,
+    file_name: str | None = None,
+) -> pl.DataFrame:
     if file_name is not None:
         gt = (
-            GT(table)
+            GT(results)
             .tab_header(title=title)
             .fmt_number(
                 columns=[
@@ -88,7 +52,7 @@ def create_calibration_table(
                 decimals=2,
             )
             .cols_label(
-                bin="Price Group",
+                price_bin="Price Group",
                 trade_time_mean="Trade Time Mean",
                 price_mean="Price Mean",
                 result_mean="Result Mean",
@@ -101,19 +65,19 @@ def create_calibration_table(
         )
         gt.save(file_name)
     else:
-        print(table)
+        print(results)
 
 
 def create_calibration_chart(
-    aggregate_trades: pl.DataFrame, title: str, file_name: str | None = None
+    results: pl.DataFrame, title: str, file_name: str | None = None
 ) -> None:
     plt.figure(figsize=(10, 6))
 
     # Result bars
-    sns.barplot(aggregate_trades, x="bin", y="result_mean", color="dimgray")
+    sns.barplot(results, x="price_bin", y="result_mean", color="dimgray")
 
     # Perfect calibration reference line
-    x_vals = [(x * 10 + 5) / 100 for x in range(10)]
+    x_vals = [(x * 10 + 5) for x in range(10)]
 
     plt.plot(
         range(len(x_vals)),
@@ -142,7 +106,12 @@ def create_calibration_chart(
 
 if __name__ == "__main__":
     # Parameters
-    trade_time = -30
+    min_elapsed_time = -180
+    max_elapsed_time = 180
+    time_interval = 60
+
+    trade_time = -60
+    time_bin = f"({trade_time}, {trade_time + time_interval}]"
 
     # Save directory
     experiment_folder = os.path.splitext(os.path.basename(__file__))[0]
@@ -150,20 +119,25 @@ if __name__ == "__main__":
     os.makedirs(folder, exist_ok=True)
 
     # Get trades
-    trades = get_trades(trade_time=trade_time)
+    trades = du.get_trades(
+        time_bin=time_bin,
+        min_elapsed_time=min_elapsed_time,
+        max_elapsed_time=max_elapsed_time,
+        time_interval=time_interval,
+    )
 
     # Get aggregate trades
-    aggregate_trades = get_aggregate_trades(trades)
+    results = get_results(trades)
 
     # Save results
     calibration_table = create_calibration_table(
-        aggregate_trades,
+        results,
         title=f"Contract Calibration (t={trade_time})",
         file_name=f"{folder}/calibration_table_t={trade_time}.png",
     )
 
     create_calibration_chart(
-        aggregate_trades,
+        results,
         title=f"Contract Calibration (t={trade_time})",
         file_name=f"{folder}/calibration_chart_t={trade_time}.png",
     )
