@@ -7,10 +7,10 @@ import numpy as np
 
 
 def get_trades(min_elapsed_time: int, max_elapsed_time, time_interval: int):
-    df = pl.read_parquet("data/2025-09-30_history.parquet")
+    df = pl.read_parquet("data/2025-10-05_history.parquet")
 
-    price_breaks = np.arange(0, 100, 10)
-    time_breaks = np.arange(min_elapsed_time + time_interval, max_elapsed_time, time_interval)
+    price_breaks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
+    time_breaks = np.arange(min_elapsed_time, max_elapsed_time + time_interval, time_interval)
 
     return (
         df.select(
@@ -28,7 +28,7 @@ def get_trades(min_elapsed_time: int, max_elapsed_time, time_interval: int):
             pl.col("result").replace({"yes": "1", "no": "0"}).cast(pl.Int32),
         )
         .sort("ticker", "end_period_ts")
-        .filter(pl.col("elapsed_time").is_between(min_elapsed_time, max_elapsed_time))
+        .filter(pl.col("elapsed_time").is_between(min_elapsed_time, max_elapsed_time, closed='right'))
         .with_columns(
             pl.col("yes_ask_close")
             .cut(price_breaks)
@@ -50,12 +50,14 @@ def get_aggregate_trades(trades: pl.DataFrame) -> pl.DataFrame:
             pl.col("result").std().mul(100).alias("result_stdev"),
             pl.len().alias("count"),
         )
+        .filter(
+            pl.col('price_mean').is_between(1, 99)
+        )
         .with_columns(
             (
                 (pl.col("result_mean") - pl.col("price_mean"))
                 / (pl.col("result_stdev") / pl.col("count").sqrt())
             )
-            # .clip(lower_bound=-10, upper_bound=10)
             .alias("tstat")
         )
         .sort("trade_time_mean", "price_mean")
@@ -70,7 +72,7 @@ def create_calibration_over_time_chart(
 ) -> None:
     if price_bin is not None:
         aggregate_trades = aggregate_trades.filter(
-            pl.col("price_bin").eq("(90, inf]")
+            pl.col("price_bin").eq(price_bin)
         ).sort("trade_time_mean")
 
     _, ax = plt.subplots(figsize=(10, 6))
@@ -109,7 +111,7 @@ def create_calibration_over_time_chart(
         ax.legend(handles, ['Price Mean', 'Result Mean'])
 
         match price_bin:
-            case "(90, inf]":
+            case "(90, 99]":
                 ax.set_ylim(90, 100)
 
             case _:
@@ -230,7 +232,7 @@ if __name__ == "__main__":
 
     # Save directory
     experiment_folder = os.path.splitext(os.path.basename(__file__))[0]
-    folder = f"nt_research/research/merger_arbitrage/results/{experiment_folder}"
+    folder = f"nt_research/research/underdog_risk_premium/results/{experiment_folder}"
     os.makedirs(folder, exist_ok=True)
 
     # Get trades
@@ -253,16 +255,16 @@ if __name__ == "__main__":
     # Create all bins result
     create_calibration_over_time_chart(
         aggregate_trades,
-        price_bin="(90, inf]",
-        title="(90, inf] Bin Calibration Over Time",
+        price_bin="(90, 99]",
+        title="(90, 99] Bin Calibration Over Time",
         file_name=f"{folder}/calibration-over-time-top-bin.png",
     )
 
     # Create counts chart
     create_count_over_time_chart(
         aggregate_trades,
-        price_bin="(90, inf]",
-        title="(90, inf] Bin Count Over Time",
+        price_bin="(90, 99]",
+        title="(90, 99] Bin Count Over Time",
         file_name=f"{folder}/count-over-time-top-bin.png",
     )
 
@@ -276,7 +278,7 @@ if __name__ == "__main__":
     # Create tstat chart top bin
     create_tstat_chart(
         aggregate_trades,
-        price_bin="(90, inf]",
-        title="(90, inf] T-stat Count Over Time",
+        price_bin="(90, 99]",
+        title="(90, 99] T-stat Count Over Time",
         file_name=f"{folder}/tstat-over-time-top-bin.png",
     )

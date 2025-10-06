@@ -7,9 +7,10 @@ from great_tables import GT
 
 
 def get_trades(trade_time: int):
-    df = pl.read_parquet("data/2025-09-30_history.parquet")
+    df = pl.read_parquet("data/2025-10-05_history.parquet")
+    print(df.select('ticker').unique())
 
-    breaks = [x * 10 for x in range(10)]
+    breaks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
 
     return (
         df.select(
@@ -35,6 +36,9 @@ def get_trades(trade_time: int):
             pl.col("elapsed_time").first(),
             pl.col("yes_ask_close").first(),
             pl.col("result").mean(),
+        )
+        .filter(
+            pl.col('yes_ask_close').is_between(1, 99)
         )
         .with_columns(pl.col("yes_ask_close").cut(breaks).cast(pl.String).alias("bin"))
         .sort("ticker")
@@ -85,8 +89,8 @@ def create_calibration_table(aggregate_trades: pl.DataFrame, title: str | None =
             .opt_stylize(style=5, color='gray')
         )
         gt.save(file_name)
-
-    return table
+    else:
+        print(table)
 
 
 def create_calibration_chart(
@@ -131,7 +135,7 @@ if __name__ == "__main__":
 
     # Save directory
     experiment_folder = os.path.splitext(os.path.basename(__file__))[0]
-    folder = f"nt_research/research/merger_arbitrage/results/{experiment_folder}"
+    folder = f"nt_research/research/underdog_risk_premium/results/{experiment_folder}"
     os.makedirs(folder, exist_ok=True)
 
     # Get trades
