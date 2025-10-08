@@ -1,11 +1,11 @@
 import polars as pl
 import seaborn as sns
 import matplotlib.pyplot as plt
+import os
 
-if __name__ == '__main__':
-    df = pl.read_parquet('data/2025-10-08_history_daily.parquet')
-    
-    df = (
+
+def get_strategy_returns(df: pl.DataFrame, price_min: int, price_max: int) -> pl.DataFrame:
+    return (
         df
         .with_columns(
             pl.col('end_period_ts').dt.convert_time_zone('America/Denver').dt.date().alias('date'),
@@ -25,7 +25,7 @@ if __name__ == '__main__':
         )
         .filter(
             pl.col('date').eq(pl.col('game_day')),
-            pl.col('price').is_between(90, 99)
+            pl.col('price').is_between(price_min, price_max)
         )
         .sort('ticker', 'date')
         .with_columns(
@@ -52,40 +52,136 @@ if __name__ == '__main__':
             pl.col('cumulative_return').sub(pl.col('max')).alias('drawdown')
         )
         .with_columns(
+            pl.col('drawdown').mul(100).alias('max_drawdown'),
             pl.col('cumulative_return').mul(100)
         )
     )
 
-    print(df)
 
-    plt.figure(figsize=(10, 6))
+def create_cumulative_return_chart(
+    results: pl.DataFrame,
+    title: str,
+    file_name: str | None = None
+) -> None:
+    plt.figure(figsize=(12, 7))
 
-    sns.lineplot(df, x='date', y='cumulative_return')
+    sns.lineplot(
+        results,
+        x='date',
+        y='cumulative_return',
+        color='black'
+    )
 
+    # Add grid
+    plt.grid(True)
+
+    # Add zero line
+    plt.axhline(y=0, color='gray', linestyle='-')
+
+    # Format
     plt.xlabel(None)
     plt.ylabel('Cumulative Return (%)')
+    plt.title(title)
 
-    plt.show()
+    plt.tight_layout()
+
+    if file_name is not None:
+        plt.savefig(file_name, dpi=300, bbox_inches='tight')
+    else:
+        plt.show()
 
 
-    plt.figure(figsize=(10, 6))
+def create_drawdown_chart(
+    results: pl.DataFrame,
+    title: str,
+    file_name: str | None = None
+) -> None:
+    plt.figure(figsize=(12, 7))
 
-    sns.lineplot(df, x='date', y='drawdown')
+    ax = sns.lineplot(
+        results,
+        x='date',
+        y='max_drawdown',
+        color='red'
+    )
 
+    ax.fill_between(
+        results['date'],
+        results['max_drawdown'],
+        0,
+        alpha=0.3,
+        color='red'
+    )
+
+    # Add grid
+    plt.grid(True)
+
+    # Add zero line
+    # plt.axhline(y=0, color='gray', linestyle='-')
+
+    # Format
     plt.xlabel(None)
-    plt.ylabel('Max Drawdown (%)')
+    plt.ylabel('Drawdown (%)')
+    plt.title(title)
 
-    plt.show()
+    plt.tight_layout()
 
-    returns = df['return'].to_numpy()
+    if file_name is not None:
+        plt.savefig(file_name, dpi=300, bbox_inches='tight')
+    else:
+        plt.show()
 
-    # Annualized Sharpe ratio (assuming 16 weeks in season trading days)
-    sharpe = (returns.mean() * 16 ** 0.5) / returns.std()
 
-    max_drawdown = df['drawdown'].min()  # Most negative value
+def calculate_performance_metrics(results: pl.DataFrame) -> dict:
+    returns = results['return'].to_numpy()
+
+    # Annualized Sharpe ratio (assuming 16 trading weeks)
+    sharpe = (returns.mean() * 16**0.5) / returns.std()
+
+    max_drawdown = results['drawdown'].min()  # Most negative value
     # Annualized return for Calmar ratio
     calmar = (returns.mean() * 16) / abs(max_drawdown)
 
-    print("Sharpe:", sharpe)
-    print("Calmar:", calmar)
+    return {
+        'sharpe': sharpe,
+        'calmar': calmar,
+        'max_drawdown': max_drawdown
+    }
 
+
+if __name__ == "__main__":
+    # Parameters
+    price_min = 90
+    price_max = 99
+
+    # Save directory
+    experiment_folder = os.path.splitext(os.path.basename(__file__))[0]
+    folder = f"nt_research/research/underdog_risk_premium/results/{experiment_folder}"
+    os.makedirs(folder, exist_ok=True)
+
+    # Load data
+    df = pl.read_parquet('data/2025-10-08_history_daily.parquet')
+
+    # Get strategy returns
+    results = get_strategy_returns(df, price_min, price_max)
+
+    print(results)
+
+    # Create charts
+    create_cumulative_return_chart(
+        results,
+        title=f"Cumulative Return (Price: {price_min}-{price_max})",
+        file_name=f"{folder}/cumulative_return.png"
+    )
+
+    create_drawdown_chart(
+        results,
+        title=f"Drawdown (Price: {price_min}-{price_max})",
+        file_name=f"{folder}/drawdown.png"
+    )
+
+    # Calculate and print performance metrics
+    metrics = calculate_performance_metrics(results)
+    print(f"Sharpe: {metrics['sharpe']:.4f}")
+    print(f"Calmar: {metrics['calmar']:.4f}")
+    print(f"Max Drawdown: {metrics['max_drawdown']:.4f}")
