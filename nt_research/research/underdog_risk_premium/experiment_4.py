@@ -49,7 +49,7 @@ if __name__ == '__main__':
             pl.col('cumulative_return').cum_max().alias('max')
         )
         .with_columns(
-            pl.col('cumulative_return').truediv(pl.col('max')).sub(1).mul(-1).alias('drawdown')
+            pl.col('cumulative_return').sub(pl.col('max')).alias('drawdown')
         )
         .with_columns(
             pl.col('cumulative_return').mul(100)
@@ -58,30 +58,33 @@ if __name__ == '__main__':
 
     print(df)
 
-    # plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 6))
 
-    # sns.lineplot(df, x='date', y='cumulative_return')
+    sns.lineplot(df, x='date', y='cumulative_return')
 
-    # plt.xlabel(None)
-    # plt.ylabel('Cumulative Return (%)')
+    plt.xlabel(None)
+    plt.ylabel('Cumulative Return (%)')
 
-    # plt.show()
+    plt.show()
 
 
-    # plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 6))
 
-    # sns.lineplot(df, x='date', y='drawdown')
+    sns.lineplot(df, x='date', y='drawdown')
 
-    # plt.xlabel(None)
-    # plt.ylabel('Max Drawdown (%)')
+    plt.xlabel(None)
+    plt.ylabel('Max Drawdown (%)')
 
-    # plt.show()
+    plt.show()
 
     returns = df['return'].to_numpy()
-    sharpe = returns.mean() / returns.std()
 
-    max_drawdown = df['drawdown'].max()
-    calmar = returns.mean() / max_drawdown
+    # Annualized Sharpe ratio (assuming 16 weeks in season trading days)
+    sharpe = (returns.mean() * 16 ** 0.5) / returns.std()
+
+    max_drawdown = df['drawdown'].min()  # Most negative value
+    # Annualized return for Calmar ratio
+    calmar = (returns.mean() * 16) / abs(max_drawdown)
 
     print("Sharpe:", sharpe)
     print("Calmar:", calmar)
