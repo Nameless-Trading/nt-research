@@ -42,12 +42,6 @@ class KalshiClient:
 
         url = BASE_URL + endpoint
 
-        try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            raise Exception(f"Failed to fetch markets: {e}")
-
         columns = [
             "ticker",
             "event_ticker",
@@ -62,9 +56,44 @@ class KalshiClient:
             "result",
         ]
 
-        df = pl.DataFrame(response.json()["markets"]).select(
-            *columns, pl.lit(series_ticker).alias("series_ticker")
-        )
+        all_markets = []
+        cursor = None
+
+        while True:
+            # Add cursor to params if we have one
+            if cursor is not None:
+                params["cursor"] = cursor
+
+            try:
+                response = requests.get(url, params=params)
+                response.raise_for_status()
+            except requests.RequestException as e:
+                raise Exception(f"Failed to fetch markets: {e}")
+
+            data = response.json()
+            markets = data.get("markets", [])
+
+            if markets:
+                all_markets.extend(markets)
+
+            # Continue if we got a full page (indicating there might be more)
+            if len(markets) < params["limit"]:
+                break
+
+            # Get the cursor for the next page
+            cursor = data.get("cursor")
+
+            # Stop if no cursor available
+            if cursor is None:
+                break
+
+        # Create DataFrame from all collected markets
+        if all_markets:
+            df = pl.DataFrame(all_markets).select(
+                *columns, pl.lit(series_ticker).alias("series_ticker")
+            )
+        else:
+            df = pl.DataFrame(schema={col: pl.Utf8 for col in columns + ["series_ticker"]})
 
         return df
 
