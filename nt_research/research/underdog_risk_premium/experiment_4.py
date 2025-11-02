@@ -160,7 +160,7 @@ if __name__ == "__main__":
     os.makedirs(folder, exist_ok=True)
 
     # Load data
-    df = pl.read_parquet('data/2025-10-23_history_daily.parquet')
+    df = pl.read_parquet('data/2025-11-02_history_daily.parquet')
 
     # Get strategy returns
     results = get_strategy_returns(df, price_min, price_max)
