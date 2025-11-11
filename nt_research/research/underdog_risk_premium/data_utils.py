@@ -8,7 +8,7 @@ def get_trades(
     time_bin: str | None = None,
     price_bin: str | None = None,
 ):
-    df = pl.read_parquet("data/2025-11-02_history.parquet")
+    df = pl.read_parquet("data/2025-11-11_history.parquet")
 
     price_breaks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
     time_breaks = np.arange(
